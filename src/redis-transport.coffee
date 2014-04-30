@@ -2,13 +2,15 @@ redis = require "redis"
 {Pool} = require "generic-pool"
 {type, toError} = require "fairmont"
 EventChannel = require "./event-channel"
+{randomKey} = require "key-forge"
 
 class RedisTransport
   
   constructor: (options) ->
     @events = new EventChannel
     poolEvents = @events.source "pool"
-    {@blockTimeout} = options
+    {@blockTimeout, @id} = options
+    @id ?= randomKey(8)
     @blockTimeout ?= 1
     @clients = Pool
       name: "redis-transport", max: 10
@@ -20,6 +22,8 @@ class RedisTransport
       destroy: (client) => client.quit()
       log: (string, level) => poolEvents.fire event: level, content: string
   
+  # Channel operations
+
   publish: (message) ->
     @events.source (events) =>
       {channel} = message
@@ -42,12 +46,14 @@ class RedisTransport
             # You can't reuse pub/sub clients
             @clients.destroy client
   
+  # Queue operations
+
   enqueue: (message) ->
     @events.source (events) =>
-      {channel} = message
+      {queue} = message
       @_acquire (client) =>
         events.on "*", => @_release client
-        client.lpush channel, JSON.stringify(message), events.callback
+        client.lpush queue, JSON.stringify(message), events.callback
     
     
   dequeue: (name) ->
@@ -73,8 +79,10 @@ class RedisTransport
       @clients.acquire events.callback
       events.on "success", (client) => handler client
        
-  _release: (client) -> @clients.release client
+  _release: (client) ->
+    @clients.release client
     
-  end: -> @clients.drain => @clients.destroyAllNow()
+  end: ->
+    @clients.drain => @clients.destroyAllNow()
   
 module.exports = RedisTransport
