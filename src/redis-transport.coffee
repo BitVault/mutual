@@ -1,6 +1,6 @@
 redis = require "redis"
 {Pool} = require "generic-pool"
-{type,toError} = require "fairmont"
+{type, toError} = require "fairmont"
 EventChannel = require "./event-channel"
 
 class RedisTransport
@@ -18,7 +18,7 @@ class RedisTransport
         client.on "error", (error) -> callback error
         client.on "connect", -> callback null, client
       destroy: (client) => client.quit()
-      log: (string,level) => poolEvents.fire event: level, content: string
+      log: (string, level) => poolEvents.fire event: level, content: string
   
   publish: (message) ->
     @events.source (events) =>
@@ -34,7 +34,7 @@ class RedisTransport
       @_acquire (client) =>
         client.subscribe name, ->
           events.fire event: "success"
-        client.on "message", (channel,json) =>
+        client.on "message", (channel, json) =>
           events.safely =>
             events.fire event: "message", content: (JSON.parse json)
         events.on "unsubscribe", =>
