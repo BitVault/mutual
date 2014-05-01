@@ -41,7 +41,7 @@ class DurableChannel extends EventChannel
     @monitorTimeouts()
 
   package: ({content, to, requestId, timeout}) ->
-    message = 
+    message =
       id: randomKey(16)
       requestId: requestId
       from: @name
@@ -65,7 +65,7 @@ class DurableChannel extends EventChannel
       @events.source (events) =>
         do @events.serially (go) =>
           go => @adapter.collection "#{name}.messages"
-          go (store) => 
+          go (store) =>
             @destinationStores[name] = store
             events.emit "success", store
 
@@ -79,7 +79,7 @@ class DurableChannel extends EventChannel
     if channel? and id? and timeout?
       @events.source (events) =>
         @adapter.client.zadd(
-          ["#{name}.pending", (Date.now() + timeout), "#{channel}::#{id}"], 
+          ["#{name}.pending", (Date.now() + timeout), "#{channel}::#{id}"],
           events.callback
         )
 
@@ -100,7 +100,7 @@ class DurableChannel extends EventChannel
               ["#{@name}.pending", 0, Date.now()]
               events.callback
             )
-        go (expiredMessages) => 
+        go (expiredMessages) =>
           return if expiredMessages.length == 0
           @events.source (events) =>
             returned = 0
@@ -111,7 +111,7 @@ class DurableChannel extends EventChannel
                 returned++
                 events.emit("success") if returned == expiredMessages.length
               _events.on "error", (err) -> events.emit "error", err
-        go => 
+        go =>
           @timeoutMonitor = setTimeout(loopToMonitor, @timeoutMonitorFrequency)
 
     @timeoutMonitor = setTimeout(loopToMonitor, @timeoutMonitorFrequency)
@@ -123,10 +123,10 @@ class DurableChannel extends EventChannel
       message = null
       do @events.serially (go) =>
         go => @getDestinationStore channel
-        go (_store) => 
+        go (_store) =>
           store = _store
           store.get(id)
-        go (_message) => 
+        go (_message) =>
           message = _message
           if message?
             store.delete id
@@ -152,7 +152,7 @@ class DurableChannel extends EventChannel
       do @events.serially (go) =>
         go => @getStore()
         go (store) => store.get message.requestId
-        go (_request) => 
+        go (_request) =>
           request = _request
           message = @package({content: response, to: request.from, requestId: message.requestId, timeout})
           @getDestinationStore(request.from)
@@ -162,6 +162,7 @@ class DurableChannel extends EventChannel
         go => events.emit "success"
 
   close: (message) ->
+    console.log message
     @events.source (events) =>
       request = null
       do @events.serially (go) =>
@@ -172,20 +173,20 @@ class DurableChannel extends EventChannel
 
   listen: ->
     @events.source (events) =>
-      @queue.listen().on "success", => 
+      @queue.listen().on "success", =>
         messageHandler = (messageId) =>
           message = null
           do @events.serially (go) =>
             go => @getStore()
             go (store) => store.get messageId
-            go (_message) => 
+            go (_message) =>
               message = _message
               @clearMessageTimeout(@name, message.from, message.requestId) if message.requestId?
             go =>
               @getDestinationStore(message.from) if message.requestId?
             go (store) =>
               store.delete(message.requestId) if message.requestId?
-            go => 
+            go =>
               _message = content: message.content
               _message.from = if message.requestId? then message.to else message.from
               _message.to = if message.requestId? then message.from else message.to
@@ -202,7 +203,7 @@ class DurableChannel extends EventChannel
 
         events.emit "success"
 
-  end: -> 
+  end: ->
     clearTimeout @timeoutMonitor
     @adapter.close()
     @queue.end()
