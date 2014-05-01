@@ -7,6 +7,7 @@ class RemoteQueue extends EventChannel
   isListening: false
   
   constructor: (options) ->
+    super
     {@name, @transport} = options
     unless @name?
       throw new Error "Remote channels cannot be anonymous"
@@ -14,12 +15,9 @@ class RemoteQueue extends EventChannel
      
   send: (message) ->
     @events.source (events) =>
-      _events = @transport.enqueue (@package message)
+      _events = @transport.enqueue @name, @package(message)
       _events.forward events
 
-  package: (message) ->
-    message.queue = @name
-    message
 
   listen: ->
     @events.source (events) =>
@@ -27,10 +25,13 @@ class RemoteQueue extends EventChannel
         @isListening = true
         
         _dequeue = =>
-          @transport.dequeue(@name).on "success", (message) =>
-            @fire message
-            if @channels[message.event]?.handlers?.length > 0
-              setImmediate(_dequeue)
+          @transport.dequeue(@name)
+            .on "warning", (error) =>
+              setImmediate _dequeue
+            .on "success", (message) =>
+              @fire message
+              if @channels[message.event]?.handlers?.length > 0
+                setImmediate(_dequeue)
 
         @superOn ?= @on
         @on = (event, handler) =>
@@ -39,6 +40,9 @@ class RemoteQueue extends EventChannel
             _dequeue()
 
         events.emit "success"
+
+  end: ->
+    @transport.end()
 
 module.exports = RemoteQueue
   

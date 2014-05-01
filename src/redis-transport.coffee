@@ -9,9 +9,8 @@ class RedisTransport
   constructor: (options) ->
     @events = new EventChannel
     poolEvents = @events.source "pool"
-    {@blockTimeout, @id} = options
-    @id ?= randomKey(8)
-    @blockTimeout ?= 1
+    {@blockTimeout} = options
+    @blockTimeout ?= 4
     @clients = Pool
       name: "redis-transport", max: 10
       create: (callback) =>
@@ -48,12 +47,11 @@ class RedisTransport
   
   # Queue operations
 
-  enqueue: (message) ->
+  enqueue: (name, message) ->
     @events.source (events) =>
-      {queue} = message
       @_acquire (client) =>
         events.on "*", => @_release client
-        client.lpush queue, JSON.stringify(message), events.callback
+        client.lpush name, JSON.stringify(message), events.callback
     
     
   dequeue: (name) ->
@@ -67,10 +65,12 @@ class RedisTransport
               client.brpop name..., @blockTimeout, _events.callback
               _events.on "success", (results) =>
                 return _dequeue() unless results?
-                events.safely =>
+                try
                   [key, json] = results
                   message = JSON.parse(json)
                   events.emit "success", message
+                catch error
+                  events.emit "warning", error
         catch
           events.emit "error"
       
