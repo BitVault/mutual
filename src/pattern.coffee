@@ -26,8 +26,6 @@ class Pattern
     @_pattern = _parse pattern
     
   match: (target) ->
-    @_match ?= memoize (target) =>
-      _match @_pattern, (_parse target)
-    @_match target
+    _match @_pattern, (_parse target)
     
 module.exports = Pattern
